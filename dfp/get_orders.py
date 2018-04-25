@@ -7,81 +7,85 @@ from googleads import dfp
 
 from dfp.client import get_client
 
-
 logger = logging.getLogger(__name__)
 
 
 def get_order_by_name(order_name):
-  """
-  Gets an order by name from DFP.
+    """
+    Gets an order by name from DFP.
 
-  Args:
-    order_name (str): the name of the DFP order
-  Returns:
-    a DFP order, or None
-  """
+    Args:
+      order_name (str): the name of the DFP order
+    Returns:
+      a DFP order, or None
+    """
 
-  dfp_client = get_client()
-  order_service = dfp_client.GetService('OrderService', version='v201802')
+    dfp_client = get_client()
+    order_service = dfp_client.GetService('OrderService', version='v201802')
 
-  # Filter by name.
-  query = 'WHERE name = :name'
-  values = [{
-    'key': 'name',
-    'value': {
-      'xsi_type': 'TextValue',
-      'value': order_name
-    }
-  }]
-  statement = dfp.FilterStatement(query, values)
-  response = order_service.getOrdersByStatement(statement.ToStatement())
+    # Filter by name.
+    query = 'WHERE name = :name'
+    values = [{
+        'key': 'name',
+        'value': {
+            'xsi_type': 'TextValue',
+            'value': order_name
+        }
+    }]
+    statement = dfp.FilterStatement(query, values)
+    response = order_service.getOrdersByStatement(statement.ToStatement())
 
-  no_order_found = False
-  try:
-    no_order_found = True if len(response['results']) < 1 else False 
-  except (AttributeError, KeyError):
-    no_order_found = True
+    no_order_found = False
+    try:
+        no_order_found = True if len(response['results']) < 1 else False
+    except (AttributeError, KeyError):
+        no_order_found = True
 
-  if no_order_found:
-    return None
-  else:
-    order = response['results'][0]
-    logger.info(u'Found an order with name "{name}".'.format(name=order['name']))
-    return order
+    if no_order_found:
+        return None
+    else:
+        order = response['results'][0]
+        logger.info(
+            u'Found an order with name "{name}".'.format(name=order['name']))
+        return order
+
 
 def get_all_orders(print_orders=False):
-  """
-  Logs all orders in DFP.
+    """
+    Logs all orders in DFP.
 
-  Returns:
-      None
-  """
+    Returns:
+        None
+    """
 
-  dfp_client = get_client()
+    dfp_client = get_client()
 
-  # Initialize appropriate service.
-  order_service = dfp_client.GetService('OrderService', version='v201802')
+    # Initialize appropriate service.
+    order_service = dfp_client.GetService('OrderService', version='v201802')
 
-  # Create a statement to select orders.
-  statement = dfp.FilterStatement()
-  print('Getting all orders...')
+    # Create a statement to select orders.
+    statement = dfp.FilterStatement()
+    print('Getting all orders...')
 
-  # Retrieve a small amount of orders at a time, paging
-  # through until all orders have been retrieved.
-  while True:
-    response = order_service.getOrdersByStatement(statement.ToStatement())
-    if 'results' in response and len(response['results']) > 0:
-      for order in response['results']:
-        msg = u'Found an order with name "{name}".'.format(name=order['name'])
-        if print_orders:
-          print(msg)
-      statement.offset += dfp.SUGGESTED_PAGE_LIMIT
-    else:
-      print('No additional orders found.')
-      break
+    # Retrieve a small amount of orders at a time, paging
+    # through until all orders have been retrieved.
+    while True:
+        response = order_service.getOrdersByStatement(statement.ToStatement())
+        if 'results' in response and len(response['results']) > 0:
+            for order in response['results']:
+                msg = u'Found an order with name "{name}".'.format(
+                    name=order['name'])
+                if print_orders:
+                    print(msg)
+            statement.offset += dfp.SUGGESTED_PAGE_LIMIT
+        else:
+            print('No additional orders found.')
+            break
+
 
 def main():
-  get_all_orders(print_orders=True)
+    get_all_orders(print_orders=True)
+
 
 if __name__ == '__main__':
-  main()
+    main()

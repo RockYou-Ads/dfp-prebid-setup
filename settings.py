@@ -3,7 +3,6 @@ import os
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 GOOGLEADS_YAML_FILE = os.path.join(ROOT_DIR, 'googleads.yaml')
 
-
 #########################################################################
 # DFP SETTINGS
 #########################################################################
@@ -23,14 +22,14 @@ DFP_TARGETED_PLACEMENT_NAMES = []
 
 # Sizes of placements. These are used to set line item and creative sizes.
 DFP_PLACEMENT_SIZES = [
-  {
-    'width': '300',
-    'height': '250'
-  },
-  {
-    'width': '728',
-    'height': '90'
-  },
+    {
+        'width': '300',
+        'height': '250'
+    },
+    {
+        'width': '728',
+        'height': '90'
+    },
 ]
 
 # Whether we should create the advertiser in DFP if it does not exist.
@@ -69,10 +68,10 @@ PREBID_BIDDER_CODE = None
 # FIXME: this should be an array of buckets. See:
 # https://github.com/prebid/Prebid.js/blob/8fed3d7aaa814e67ca3efc103d7d306cab8c692c/src/cpmBucketManager.js
 PREBID_PRICE_BUCKETS = {
-  'precision': 2,
-  'min' : 0,
-  'max' : 20,
-  'increment': 0.10,
+    'precision': 2,
+    'min': 0,
+    'max': 20,
+    'increment': 0.10,
 }
 
 #########################################################################

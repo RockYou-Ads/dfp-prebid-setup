@@ -8,28 +8,28 @@ from dfp.client import get_client
 
 
 def get_order_by_name(order_name):
-  """
-  Gets an order by name from DFP.
+    """
+    Gets an order by name from DFP.
 
-  Args:
-    order_name (str): the name of the DFP order
-  Returns:
-    a DFP order, or None
-  """
+    Args:
+      order_name (str): the name of the DFP order
+    Returns:
+      a DFP order, or None
+    """
 
-  print('Getting order with order name {0}...'.format(order_name))
+    print('Getting order with order name {0}...'.format(order_name))
 
-  client = get_client()
-  order_service = client.GetService('OrderService', version='v201802')
+    client = get_client()
+    order_service = client.GetService('OrderService', version='v201802')
 
-  statement = (dfp.StatementBuilder()
-    .Where('name = :name')
-    .WithBindVariable('name', order_name))
-  response = order_service.getOrdersByStatement(statement.ToStatement())
+    statement = (dfp.StatementBuilder()
+                 .Where('name = :name')
+                 .WithBindVariable('name', order_name))
+    response = order_service.getOrdersByStatement(statement.ToStatement())
 
-  if 'results' in response and len(response['results']) > 0:
-    print('Finished fetching order.')
-    return response['results'][0]
-  else:
-    print('Warning: no order found.')
-    return None
+    if 'results' in response and len(response['results']) > 0:
+        print('Finished fetching order.')
+        return response['results'][0]
+    else:
+        print('Warning: no order found.')
+        return None
