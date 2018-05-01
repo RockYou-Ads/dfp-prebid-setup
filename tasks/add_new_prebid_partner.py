@@ -48,10 +48,13 @@ else:
 logger = logging.getLogger(__name__)
 
 
-def setup_partner(user_email, advertiser_name, order_name, placements,
+def setup_partner(user_email, advertiser_name, order_bases,
+                  placements,
                   sizes, bidder_code, prices, num_creatives, currency_code):
     """
     Call all necessary DFP tasks for a new Prebid partner setup.
+    Args:
+      order_bases (iterable of dict): the name of the order
     """
 
     # Get the user.
@@ -64,38 +67,48 @@ def setup_partner(user_email, advertiser_name, order_name, placements,
     advertiser_id = dfp.get_advertisers.get_advertiser_id_by_name(
         advertiser_name)
 
-    # Create the order.
-    order_id = dfp.create_orders.create_order(order_name, advertiser_id,
-                                              user_id)
+    # loop here
+    for order_base in order_bases:
+        # Create the order.
+        order_id = dfp.create_orders.create_order(order_base, advertiser_id,
+                                                  user_id)
 
-    # Create creatives.
-    creative_configs = dfp.create_creatives.create_duplicate_creative_configs(
-        bidder_code, order_name, advertiser_id, num_creatives)
-    creative_ids = dfp.create_creatives.create_creatives(creative_configs)
+        # Create creatives.
+        creative_configs = dfp.create_creatives.create_duplicate_creative_configs(
+            bidder_code, order_base, advertiser_id, num_creatives)
+        creative_ids = dfp.create_creatives.create_creatives(creative_configs)
 
-    # Get DFP key IDs for line item targeting.
-    hb_bidder_key_id = get_or_create_dfp_targeting_key('hb_bidder')
-    hb_pb_key_id = get_or_create_dfp_targeting_key('hb_pb')
+        # Get DFP key IDs for line item targeting.
+        hb_bidder_key_id = get_or_create_dfp_targeting_key('hb_bidder')
+        hb_pb_key_id = get_or_create_dfp_targeting_key('hb_pb')
 
-    # Instantiate DFP targeting value ID getters for the targeting keys.
-    HBBidderValueGetter = DFPValueIdGetter('hb_bidder')
-    HBPBValueGetter = DFPValueIdGetter('hb_pb')
+        # Instantiate DFP targeting value ID getters for the targeting keys.
+        HBBidderValueGetter = DFPValueIdGetter('hb_bidder')
+        HBPBValueGetter = DFPValueIdGetter('hb_pb')
 
-    # Create line items.
-    line_items_config = create_line_item_configs(prices, order_id,
-                                                 placement_ids, bidder_code,
-                                                 sizes, hb_bidder_key_id,
-                                                 hb_pb_key_id,
-                                                 currency_code,
-                                                 HBBidderValueGetter,
-                                                 HBPBValueGetter)
-    logger.info("Creating line items...")
-    line_item_ids = dfp.create_line_items.create_line_items(line_items_config)
+        rebased_prices = map(lambda p: p + order_base['base'], prices)
 
-    # Associate creatives with line items.
-    dfp.associate_line_items_and_creatives.make_licas(line_item_ids,
-                                                      creative_ids,
-                                                      size_overrides=sizes)
+        # Create line items.
+        line_items_config = create_line_item_configs(rebased_prices, order_id,
+                                                     placement_ids,
+                                                     bidder_code,
+                                                     sizes, hb_bidder_key_id,
+                                                     hb_pb_key_id,
+                                                     currency_code,
+                                                     HBBidderValueGetter,
+                                                     HBPBValueGetter)
+        logger.info("Creating line items...")
+        line_item_ids = dfp.create_line_items.create_line_items(
+            line_items_config,
+            logger
+        )
+
+        # Associate creatives with line items.
+        dfp.associate_line_items_and_creatives.make_licas(line_item_ids,
+                                                          creative_ids,
+                                                          size_overrides=sizes)
+
+        # end loop
 
     logger.info("""
 
@@ -165,7 +178,9 @@ def get_or_create_dfp_targeting_key(name):
     return key_id
 
 
-def create_line_item_configs(prices, order_id, placement_ids, bidder_code,
+def create_line_item_configs(prices, order_id,
+                             placement_ids,
+                             bidder_code,
                              sizes, hb_bidder_key_id, hb_pb_key_id,
                              currency_code, HBBidderValueGetter,
                              HBPBValueGetter):
@@ -173,7 +188,7 @@ def create_line_item_configs(prices, order_id, placement_ids, bidder_code,
     Create a line item config for each price bucket.
 
     Args:
-      prices (array)
+      prices (iterable of float)
       order_id (int)
       placement_ids (arr)
       bidder_code (str)
@@ -187,14 +202,21 @@ def create_line_item_configs(prices, order_id, placement_ids, bidder_code,
     """
 
     # The DFP targeting value ID for this `hb_bidder` code.
-    hb_bidder_value_id = HBBidderValueGetter.get_value_id(bidder_code)
+    if bidder_code is None:
+        hb_bidder_value_id = None
+    else:
+        hb_bidder_value_id = HBBidderValueGetter.get_value_id(bidder_code)
 
     line_items_config = []
     for price in prices:
         price_str = num_to_str(micro_amount_to_num(price))
 
+        format_string = u'{bidder_code}: HB ${price}'
+        if bidder_code is None:
+            format_string = u'HB ${price}'
+
         # Autogenerate the line item name.
-        line_item_name = u'{bidder_code}: HB ${price}'.format(
+        line_item_name = format_string.format(
             bidder_code=bidder_code,
             price=price_str
         )
@@ -206,7 +228,7 @@ def create_line_item_configs(prices, order_id, placement_ids, bidder_code,
             name=line_item_name,
             order_id=order_id,
             placement_ids=placement_ids,
-            cpm_micro_amount=price,
+            cpm_micro_amount=int(price),
             sizes=sizes,
             hb_bidder_key_id=hb_bidder_key_id,
             hb_pb_key_id=hb_pb_key_id,
@@ -310,17 +332,22 @@ def main():
     # creative per ad unit on a page. See:
     # https://github.com/kmjennison/dfp-prebid-setup/issues/13
     num_creatives = (
-            getattr(settings, 'DFP_NUM_CREATIVES_PER_LINE_ITEM', None) or
-            len(placements)
+            getattr(settings, 'DFP_NUM_CREATIVES_PER_LINE_ITEM', None)
+            # or
+            # len(placements)
     )
 
     bidder_code = getattr(settings, 'PREBID_BIDDER_CODE', None)
-    if bidder_code is None:
-        raise MissingSettingException('PREBID_BIDDER_CODE')
+    # if bidder_code is None:
+    #     raise MissingSettingException('PREBID_BIDDER_CODE')
 
     price_buckets = getattr(settings, 'PREBID_PRICE_BUCKETS', None)
     if price_buckets is None:
         raise MissingSettingException('PREBID_PRICE_BUCKETS')
+
+    order_buckets = getattr(settings, 'PREBID_ORDER_BUCKETS', [])
+    if order_buckets is None:
+        raise MissingSettingException('PREBID_ORDER_BUCKETS')
 
     check_price_buckets_validity(price_buckets)
 
@@ -354,6 +381,10 @@ def main():
             value_start_format=color.BLUE,
         ))
 
+    order_bases = create_order_bases(order_buckets, order_name)
+
+    logger.info("Order Prices: {order_bases}".format(order_bases=order_bases))
+
     ok = input('Is this correct? (y/n)\n')
 
     if ok != 'y':
@@ -363,7 +394,7 @@ def main():
     setup_partner(
         user_email,
         advertiser_name,
-        order_name,
+        order_bases,
         placements,
         sizes,
         bidder_code,
@@ -371,6 +402,27 @@ def main():
         num_creatives,
         currency_code,
     )
+
+
+def xfrange(start, stop, step):
+    i = 0
+    while start + i * step < stop:
+        yield start + i * step
+        i += 1
+
+
+def create_order_bases(order_buckets, order_name):
+    bases = []
+    for i in xfrange(order_buckets['min'], order_buckets['max'],
+                     order_buckets['increment']):
+        bases .append({
+            # "name": "{order_name}: {base}".format(order_name=order_name,
+            #                                       base=i),
+            "name": "%s: %05.2f" % (order_name, i),
+            "base": i * 1000000
+        })
+
+    return bases
 
 
 if __name__ == '__main__':

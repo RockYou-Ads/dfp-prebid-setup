@@ -29,12 +29,12 @@ def create_order_config(name, advertiser_id, trafficker_id):
     }
 
 
-def create_order(order_name, advertiser_id, trafficker_id):
+def create_order(order_base, advertiser_id, trafficker_id):
     """
     Creates an order in DFP.
 
     Args:
-      order_name (str): the name of the order
+      order_base (dict): the name of the order
       advertiser_id (int): the ID of the advertiser in DFP
       trafficker_id (int): the ID of the DFP user owning the order
     Returns:
@@ -45,7 +45,7 @@ def create_order(order_name, advertiser_id, trafficker_id):
 
     # Check to make sure an order does not exist with this name.
     # Otherwise, DFP will throw an exception.
-    existing_order = dfp.get_orders.get_order_by_name(order_name)
+    existing_order = dfp.get_orders.get_order_by_name(order_base['name'])
     if existing_order is not None:
 
         # If the settings allow modifying an existing order, do so. Otherwise,
@@ -61,12 +61,13 @@ def create_order(order_name, advertiser_id, trafficker_id):
         else:
             raise BadSettingException(('An order already exists with name {0}. '
                                        'Please choose a new order name.').format(
-                order_name))
+                order_base['name']))
 
     # No order with the name exists, so create it.
     else:
         orders = [
-            create_order_config(name=order_name, advertiser_id=advertiser_id,
+            create_order_config(name=order_base['name'],
+                                advertiser_id=advertiser_id,
                                 trafficker_id=trafficker_id)
         ]
         order_service = dfp_client.GetService('OrderService', version='v201802')

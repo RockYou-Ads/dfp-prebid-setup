@@ -65,30 +65,37 @@ def create_creative_config(name, advertiser_id):
     return config
 
 
-def build_creative_name(bidder_code, order_name, creative_num):
+def build_creative_name(bidder_code, order_base, creative_num):
     """
     Returns a name for a creative.
 
     Args:
       bidder_code (str): the bidder code for the header bidding partner
-      order_name (int): the name of the order in DFP
+      order_base (dict): the name of the order in DFP
       creative_num (int): the num_creatives distinguising this creative from any
         duplicates
     Returns:
       a string
     """
-    return '{bidder_code}: HB {order_name}, #{num}'.format(
-        bidder_code=bidder_code, order_name=order_name, num=creative_num)
+    format_string = '{bidder_code}: HB {order_name}, #{num}'
+    if bidder_code is None:
+        format_string = 'HB {order_name}, #{num}'
+
+    return format_string.format(
+        bidder_code=bidder_code,
+        order_name=order_base['name'],
+        num=creative_num
+    )
 
 
-def create_duplicate_creative_configs(bidder_code, order_name, advertiser_id,
+def create_duplicate_creative_configs(bidder_code, order_base, advertiser_id,
                                       num_creatives=1):
     """
     Returns an array of creative config object.
 
     Args:
       bidder_code (str): the bidder code for the header bidding partner
-      order_name (int): the name of the order in DFP
+      order_base (dict): the name of the order in DFP
       advertiser_id (int): the ID of the advertiser in DFP
       num_creatives (int): how many creative configs to generate
     Returns:
@@ -97,7 +104,7 @@ def create_duplicate_creative_configs(bidder_code, order_name, advertiser_id,
     creative_configs = []
     for creative_num in range(1, num_creatives + 1):
         config = create_creative_config(
-            name=build_creative_name(bidder_code, order_name, creative_num),
+            name=build_creative_name(bidder_code, order_base, creative_num),
             advertiser_id=advertiser_id,
         )
         creative_configs.append(config)

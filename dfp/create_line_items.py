@@ -3,7 +3,7 @@ from googleads import dfp
 from dfp.client import get_client
 
 
-def create_line_items(line_items):
+def create_line_items(line_items, logger):
     """
     Creates line items in DFP.
 
@@ -15,6 +15,9 @@ def create_line_items(line_items):
     dfp_client = get_client()
     line_item_service = dfp_client.GetService('LineItemService',
                                               version='v201802')
+
+    logger.info("line Items to create: {line_items}".format(line_items = line_items))
+
     line_items = line_item_service.createLineItems(line_items)
 
     # Return IDs of created line items.
@@ -24,7 +27,9 @@ def create_line_items(line_items):
     return created_line_item_ids
 
 
-def create_line_item_config(name, order_id, placement_ids, cpm_micro_amount,
+def create_line_item_config(name, order_id,
+                            placement_ids,
+                            cpm_micro_amount,
                             sizes, hb_bidder_key_id, hb_pb_key_id,
                             hb_bidder_value_id, hb_pb_value_id,
                             currency_code='USD'):
@@ -58,12 +63,15 @@ def create_line_item_config(name, order_id, placement_ids, cpm_micro_amount,
     # https://github.com/googleads/googleads-python-lib/blob/master/examples/dfp/v201802/line_item_service/target_custom_criteria.py
     # create custom criterias
 
-    hb_bidder_criteria = {
-        'xsi_type': 'CustomCriteria',
-        'keyId': hb_bidder_key_id,
-        'valueIds': [hb_bidder_value_id],
-        'operator': 'IS'
-    }
+    if hb_bidder_value_id is not None:
+        hb_bidder_criteria = {
+            'xsi_type': 'CustomCriteria',
+            'keyId': hb_bidder_key_id,
+            'valueIds': [hb_bidder_value_id],
+            'operator': 'IS'
+        }
+    else:
+        hb_bidder_criteria = None
 
     hb_pb_criteria = {
         'xsi_type': 'CustomCriteria',
@@ -71,6 +79,11 @@ def create_line_item_config(name, order_id, placement_ids, cpm_micro_amount,
         'valueIds': [hb_pb_value_id],
         'operator': 'IS'
     }
+
+    if hb_bidder_criteria is not None:
+        children = [hb_bidder_criteria, hb_pb_criteria]
+    else:
+        children = [hb_pb_criteria]
 
     # The custom criteria will resemble:
     # (hb_bidder_criteria.key == hb_bidder_criteria.value AND
