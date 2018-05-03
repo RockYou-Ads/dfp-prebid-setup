@@ -50,7 +50,8 @@ logger = logging.getLogger(__name__)
 
 def setup_partner(user_email, advertiser_name, order_bases,
                   placements,
-                  sizes, bidder_code, prices, num_creatives, currency_code):
+                  sizes, bidder_code, prices, num_creatives, currency_code,
+                  vast_url):
     """
     Call all necessary DFP tasks for a new Prebid partner setup.
     Args:
@@ -74,9 +75,14 @@ def setup_partner(user_email, advertiser_name, order_bases,
                                                   user_id)
 
         # Create creatives.
-        creative_configs = dfp.create_creatives.create_duplicate_creative_configs(
-            bidder_code, order_base, advertiser_id, num_creatives)
+        ccs = dfp.create_creatives.create_duplicate_creative_configs(
+            bidder_code, order_base, advertiser_id, vast_url, num_creatives)
+
+        creative_configs = ccs['banner']
+        creative_vid_configs = ccs['vast']
+
         creative_ids = dfp.create_creatives.create_creatives(creative_configs)
+        vast_creatives = dfp.create_creatives.create_creatives(creative_vid_configs)
 
         # Get DFP key IDs for line item targeting.
         hb_bidder_key_id = get_or_create_dfp_targeting_key('hb_bidder')
@@ -89,7 +95,7 @@ def setup_partner(user_email, advertiser_name, order_bases,
         rebased_prices = map(lambda p: p + order_base['base'], prices)
 
         # Create line items.
-        line_items_config = create_line_item_configs(rebased_prices, order_id,
+        (line_items_config, vast_configs) = create_line_item_configs(rebased_prices, order_id,
                                                      placement_ids,
                                                      bidder_code,
                                                      sizes, hb_bidder_key_id,
@@ -102,10 +108,16 @@ def setup_partner(user_email, advertiser_name, order_bases,
             line_items_config,
             logger
         )
+        vast_line_item_ids = dfp.create_line_items.create_line_items(
+            vast_configs,
+            logger
+        )
 
         # Associate creatives with line items.
         dfp.associate_line_items_and_creatives.make_licas(line_item_ids,
                                                           creative_ids,
+                                                          vast_line_item_ids,
+                                                          vast_creatives,
                                                           size_overrides=sizes)
 
         # end loop
@@ -208,6 +220,8 @@ def create_line_item_configs(prices, order_id,
         hb_bidder_value_id = HBBidderValueGetter.get_value_id(bidder_code)
 
     line_items_config = []
+    vast_line_items_config =[]
+
     for price in prices:
         price_str = num_to_str(micro_amount_to_num(price))
 
@@ -234,12 +248,39 @@ def create_line_item_configs(prices, order_id,
             hb_pb_key_id=hb_pb_key_id,
             hb_bidder_value_id=hb_bidder_value_id,
             hb_pb_value_id=hb_pb_value_id,
+            is_vast=False,
+            currency_code=currency_code,
+        )
+
+        vast_sizes = [
+            {
+                'width': '400',
+                'height': '300'
+            },
+            {
+                'width': '640',
+                'height': '480'
+            },
+        ]
+
+        vast_config = dfp.create_line_items.create_line_item_config(
+            name=line_item_name,
+            order_id=order_id,
+            placement_ids=placement_ids,
+            cpm_micro_amount=int(price),
+            sizes=vast_sizes,
+            hb_bidder_key_id=hb_bidder_key_id,
+            hb_pb_key_id=hb_pb_key_id,
+            hb_bidder_value_id=hb_bidder_value_id,
+            hb_pb_value_id=hb_pb_value_id,
+            is_vast=True,
             currency_code=currency_code,
         )
 
         line_items_config.append(config)
+        vast_line_items_config.append(vast_config)
 
-    return line_items_config
+    return (line_items_config, vast_line_items_config)
 
 
 def check_price_buckets_validity(price_buckets):
@@ -332,9 +373,9 @@ def main():
     # creative per ad unit on a page. See:
     # https://github.com/kmjennison/dfp-prebid-setup/issues/13
     num_creatives = (
-            getattr(settings, 'DFP_NUM_CREATIVES_PER_LINE_ITEM', None)
-            # or
-            # len(placements)
+        getattr(settings, 'DFP_NUM_CREATIVES_PER_LINE_ITEM', None)
+        # or
+        # len(placements)
     )
 
     bidder_code = getattr(settings, 'PREBID_BIDDER_CODE', None)
@@ -348,6 +389,10 @@ def main():
     order_buckets = getattr(settings, 'PREBID_ORDER_BUCKETS', [])
     if order_buckets is None:
         raise MissingSettingException('PREBID_ORDER_BUCKETS')
+
+    vast_url = getattr(settings, 'VAST_URL_DEFAULT', None)
+    if vast_url is None:
+        raise MissingSettingException('VAST_URL_DEFAULT')
 
     check_price_buckets_validity(price_buckets)
 
@@ -401,6 +446,7 @@ def main():
         prices,
         num_creatives,
         currency_code,
+        vast_url,
     )
 
 
@@ -415,7 +461,7 @@ def create_order_bases(order_buckets, order_name):
     bases = []
     for i in xfrange(order_buckets['min'], order_buckets['max'],
                      order_buckets['increment']):
-        bases .append({
+        bases.append({
             # "name": "{order_name}: {base}".format(order_name=order_name,
             #                                       base=i),
             "name": "%s: %05.2f" % (order_name, i),

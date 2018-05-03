@@ -8,7 +8,7 @@ GOOGLEADS_YAML_FILE = os.path.join(ROOT_DIR, 'googleads.yaml')
 #########################################################################
 
 # A string describing the order
-DFP_ORDER_NAME = 'RY Test Order P'
+DFP_ORDER_NAME = 'RY Test Order Q6'
 
 # The email of the DFP user who will be the trafficker for
 # the created order
@@ -160,7 +160,7 @@ DFP_CREATE_ADVERTISER_IF_DOES_NOT_EXIST = False
 
 # SET TO TRUE for fixes
 
-DFP_USE_EXISTING_ORDER_IF_EXISTS = False
+DFP_USE_EXISTING_ORDER_IF_EXISTS = True
 
 # Optional
 # Each line item should have at least as many creatives as the number of 
@@ -202,6 +202,8 @@ PREBID_ORDER_BUCKETS = {
     'max': 11,
     'increment': 1.0,
 }
+
+VAST_URL_DEFAULT = 'https://invalidvast.rockyou.net'
 
 #########################################################################
 

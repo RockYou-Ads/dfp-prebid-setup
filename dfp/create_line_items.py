@@ -16,8 +16,6 @@ def create_line_items(line_items, logger):
     line_item_service = dfp_client.GetService('LineItemService',
                                               version='v201802')
 
-    logger.info("line Items to create: {line_items}".format(line_items = line_items))
-
     line_items = line_item_service.createLineItems(line_items)
 
     # Return IDs of created line items.
@@ -32,6 +30,7 @@ def create_line_item_config(name, order_id,
                             cpm_micro_amount,
                             sizes, hb_bidder_key_id, hb_pb_key_id,
                             hb_bidder_value_id, hb_pb_value_id,
+                            is_vast,
                             currency_code='USD'):
     """
     Creates a line item config object.
@@ -94,9 +93,16 @@ def create_line_item_config(name, order_id,
         'children': [hb_bidder_criteria, hb_pb_criteria]
     }
 
+    if is_vast:
+        environment = 'VIDEO_PLAYER'
+    else:
+        environment = 'BROWSER'
+
+    set_name = name + ' [B]' if not is_vast else name + ' [V]'
+
     # https://developers.google.com/doubleclick-publishers/docs/reference/v201802/LineItemService.LineItem
     line_item_config = {
-        'name': name,
+        'name': set_name,
         'orderId': order_id,
         # https://developers.google.com/doubleclick-publishers/docs/reference/v201802/LineItemService.Targeting
         'targeting': {
@@ -118,5 +124,6 @@ def create_line_item_config(name, order_id,
             'goalType': 'NONE'
         },
         'creativePlaceholders': creative_placeholders,
+        'environmentType': environment,
     }
     return line_item_config
